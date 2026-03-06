@@ -17,7 +17,7 @@ Proiectul permite utilizatorilor să plaseze "orașe" (noduri) pe un ecran și e
 
 ## 🚀 Cum se utilizează
 
-1. Deschideți fișierul `index.html` în orice browser web modern. (Sau accesați [Link-ul Live](#) dacă este găzduit pe GitHub Pages).
+1. Deschideți fișierul `index.html` în orice browser web modern. (Sau accesați [Link-ul Live](https://stefanpopescu-ai.github.io/Aproximare-2-pentru-TSP-Metric/) dacă este găzduit pe GitHub Pages).
 2. Faceți click pe spațiul alb pentru a adăuga cel puțin **3 orașe**.
 3. Apăsați butonul **"Calculează APCM & Preordine"**.
 4. Ecranul se va împărți în două. Utilizați butonul **"Pasul Următor"** (sau apăsați tasta `Spațiu`) pentru a anima construcția traseului TSP.
