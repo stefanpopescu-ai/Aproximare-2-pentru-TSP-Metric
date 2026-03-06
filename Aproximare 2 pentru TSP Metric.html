@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vizualizator Interactiv TSP - Aproximare 2</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #header {
+            width: 100%;
+            background-color: white;
+            padding: 15px 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; color: #1c1e21; }
+        #status { margin: 5px 0 0; color: #606770; }
+
+        #container {
+            display: flex;
+            gap: 20px;
+            max-width: 1400px;
+            width: 95%;
+            flex-grow: 1;
+            margin-bottom: 20px;
+        }
+
+        #canvas-wrapper {
+            display: flex;
+            gap: 15px;
+            background-color: #f0f2f5;
+            flex-grow: 1;
+            min-height: 500px;
+        }
+
+        .canvas-panel {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow: hidden;
+            width: 100%; /* Ajută flexbox să împartă spațiul în mod egal */
+        }
+
+        .panel-title {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 1.1rem;
+            color: #333;
+            display: none; /* Ascuns până la calcul */
+        }
+
+        .canvas-container {
+            flex-grow: 1;
+            position: relative;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        #panel-tsp {
+            display: none; /* Ascuns până la calcul */
+        }
+
+        #controls {
+            width: 280px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #controls h2 { font-size: 1.1rem; margin: 0 0 10px; }
+        
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .btn:hover:not(:disabled) { background-color: #0056b3; }
+        .btn:disabled { background-color: #c9d1d9; cursor: not-allowed; }
+        
+        #btn-compute { background-color: #28a745; }
+        #btn-compute:hover:not(:disabled) { background-color: #218838; }
+        
+        #btn-reset { background-color: #dc3545; }
+        #btn-reset:hover:not(:disabled) { background-color: #c82333; }
+
+        #legend { margin-top: auto; border-top: 1px solid #eee; padding-top: 15px; font-size: 0.9rem;}
+        .legend-item { display: flex; align-items: center; margin-bottom: 8px; }
+        .color-box { width: 16px; height: 16px; border-radius: 4px; margin-right: 10px; border: 1px solid rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <h1>Aproximare 2 pentru TSP Metric</h1>
+        <p id="status">Faceți clic pe pânza albă pentru a plasa orașe.</p>
+    </div>
+
+    <div id="container">
+        <div id="canvas-wrapper">
+            <div class="canvas-panel" id="panel-mst">
+                <h3 class="panel-title" id="title-mst">1. Arbore Parțial de Cost Minim (APCM)</h3>
+                <div class="canvas-container" id="container-mst">
+                    <canvas id="canvasMst"></canvas>
+                </div>
+            </div>
+            
+            <div class="canvas-panel" id="panel-tsp">
+                <h3 class="panel-title" id="title-tsp">2. Turul TSP Final</h3>
+                <div class="canvas-container" id="container-tsp">
+                    <canvas id="canvasTsp"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div id="controls">
+            <h2>Comenzi Algoritm</h2>
+            <button id="btn-compute" class="btn" onclick="runAlgorithm()" disabled>Calculează APCM & Preordine</button>
+            <button id="btn-next" class="btn" onclick="advanceTourStep()" disabled>Pasul Următor (sau Spațiu)</button>
+            <button id="btn-reset" class="btn" onclick="resetApp()">Resetează Pânza</button>
+
+            <div id="legend">
+                <strong>Legendă:</strong><br><br>
+                <div class="legend-item"><div class="color-box" style="background:#55ff55; border-color:#00aa00;"></div> Muchie APCM</div>
+                <div class="legend-item"><div class="color-box" style="background:#ff3333;"></div> Muchie Tur TSP</div>
+                <div class="legend-item"><div class="color-box" style="background:#ff3333; border-style: dashed; background:repeating-linear-gradient(45deg, #ffcccc, #ffcccc 2px, #fff 2px, #fff 4px);"></div> Cale Scurtătură</div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- Configurare și Inițializare ---
+    const canvasMst = document.getElementById('canvasMst');
+    const ctxMst = canvasMst.getContext('2d');
+    
+    const canvasTsp = document.getElementById('canvasTsp');
+    const ctxTsp = canvasTsp.getContext('2d');
+
+    const containerMst = document.getElementById('container-mst');
+    const containerTsp = document.getElementById('container-tsp');
+    const panelTsp = document.getElementById('panel-tsp');
+
+    const statusText = document.getElementById('status');
+    const btnCompute = document.getElementById('btn-compute');
+    const btnNext = document.getElementById('btn-next');
+
+    const dpr = window.devicePixelRatio || 1;
+
+    // Setează dimensiunile pânzelor pe baza dimensiunii curente de aspect CSS
+    function resizeCanvas() {
+        [
+            { canvas: canvasMst, container: containerMst, ctx: ctxMst },
+            { canvas: canvasTsp, container: containerTsp, ctx: ctxTsp }
+        ].forEach(target => {
+            if (target.container.clientWidth === 0) return; // Omite dacă este ascuns
+            const w = target.container.clientWidth;
+            const h = target.container.clientHeight;
+            target.canvas.width = w * dpr;
+            target.canvas.height = h * dpr;
+            target.canvas.style.width = w + 'px';
+            target.canvas.style.height = h + 'px';
+            
+            // Resetează matricea de scalare înainte de a o reaplica
+            target.ctx.setTransform(1, 0, 0, 1, 0, 0); 
+            target.ctx.scale(dpr, dpr);
+        });
+
+        if (nodes.length > 0) draw(); 
+    }
+    
+    window.addEventListener('load', resizeCanvas);
+    window.addEventListener('resize', resizeCanvas);
+
+    // --- Variabile de Stare ---
+    // Acum stocăm punctele ca procente (0.0 la 1.0) pentru a supraviețui împărțirii ecranului!
+    let nodes = []; 
+    let mstEdges = []; 
+    let fullTourOrder = []; 
+    let animationEdges = []; 
+    let currentStep = -1;
+    let appState = 'adding_nodes'; 
+
+    document.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && appState === 'animating') {
+            e.preventDefault(); 
+            advanceTourStep();
+        }
+    });
+
+    // Gestionare Intrare de la utilizator
+    canvasMst.addEventListener('pointerdown', (e) => {
+        if (appState !== 'adding_nodes') return;
+        
+        const rect = canvasMst.getBoundingClientRect();
+        const px = e.clientX - rect.left;
+        const py = e.clientY - rect.top;
+        
+        // Salvează ca și coordonate relative
+        nodes.push({ 
+            pctX: px / rect.width, 
+            pctY: py / rect.height, 
+            id: nodes.length 
+        });
+        
+        draw();
+        
+        if (nodes.length >= 3) {
+            btnCompute.disabled = false;
+            statusText.textContent = `Ați adăugat ${nodes.length} orașe. Faceți clic pe 'Calculează' când sunteți gata.`;
+        } else {
+            statusText.textContent = `Sunt necesare cel puțin 3 orașe (${nodes.length} adăugate).`;
+        }
+    });
+
+    // Funcție ajutătoare pentru a obține pixelii reali pentru dimensiunea curentă a pânzei
+    function getRealCoords(node, canvasEl) {
+        return {
+            x: node.pctX * canvasEl.clientWidth,
+            y: node.pctY * canvasEl.clientHeight
+        };
+    }
+
+    // --- Logica Grafului și a Algoritmilor ---
+    function calculateDistance(n1, n2) {
+        const dx = n1.pctX - n2.pctX;
+        const dy = n1.pctY - n2.pctY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function computeMST() {
+        if (nodes.length < 3) return;
+        let edges = [];
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                edges.push({ u: i, v: j, weight: calculateDistance(nodes[i], nodes[j]) });
+            }
+        }
+        edges.sort((a, b) => a.weight - b.weight); 
+
+        let parent = [...Array(nodes.length).keys()];
+        function find(i) {
+            while (parent[i] !== i) i = parent[i];
+            return i;
+        }
+        function union(i, j) {
+            const rootI = find(i);
+            const rootJ = find(j);
+            if (rootI !== rootJ) {
+                parent[rootI] = rootJ;
+                return true;
+            }
+            return false;
+        }
+
+        mstEdges = [];
+        let edgesCount = 0;
+        for (let i = 0; edgesCount < nodes.length - 1 && i < edges.length; i++) {
+            if (union(edges[i].u, edges[i].v)) {
+                mstEdges.push([edges[i].u, edges[i].v]);
+                edgesCount++;
+            }
+        }
+    }
+
+    function computePreorder() {
+        let adj = Array.from({ length: nodes.length }, () => []);
+        mstEdges.forEach(([u, v]) => {
+            adj[u].push(v);
+            adj[v].push(u);
+        });
+
+        fullTourOrder = [];
+        let visited = new Set();
+
+        function dfs(u) {
+            visited.add(u);
+            fullTourOrder.push(u);
+            adj[u].sort((a,b) => a-b).forEach(v => {
+                if (!visited.has(v)) dfs(v);
+            });
+        }
+        dfs(0); 
+        fullTourOrder.push(0); 
+    }
+
+    function buildAnimationSequence() {
+        animationEdges = [];
+        for (let i = 0; i < fullTourOrder.length - 1; i++) {
+            const u = fullTourOrder[i];
+            const v = fullTourOrder[i + 1];
+            
+            let isMstEdge = mstEdges.some(edge => 
+                (edge[0] === u && edge[1] === v) || (edge[0] === v && edge[1] === u)
+            );
+            
+            animationEdges.push({ from: u, to: v, type: isMstEdge ? 'mst' : 'shortcut' });
+        }
+    }
+
+    // --- Fluxul Aplicației ---
+    function runAlgorithm() {
+        computeMST();
+        computePreorder();
+        buildAnimationSequence();
+        
+        appState = 'viewing_mst';
+        currentStep = -1;
+        
+        btnCompute.disabled = true;
+        btnNext.disabled = false;
+        
+        // Afișează vizualizarea alăturată!
+        panelTsp.style.display = 'flex';
+        document.getElementById('title-mst').style.display = 'block';
+        document.getElementById('title-tsp').style.display = 'block';
+        
+        // Recalculează dimensiunile astfel încât pânzele să se micșoreze/crească corect
+        resizeCanvas();
+        
+        statusText.innerHTML = "<strong>Ecran Împărțit!</strong> Stânga: APCM. Dreapta: Apăsați Spațiu sau 'Pasul Următor' pentru a trasa turul.";
+        draw();
+    }
+
+    function advanceTourStep() {
+        if (appState !== 'viewing_mst' && appState !== 'animating') return;
+        
+        appState = 'animating';
+        currentStep++;
+        
+        if (currentStep < animationEdges.length) {
+            const edge = animationEdges[currentStep];
+            statusText.textContent = `Pasul ${currentStep + 1}: Vizitare Nod ${edge.to}`;
+        } else {
+            statusText.innerHTML = "<strong>Tur Finalizat!</strong> Resetați pânza pentru a încerca un model nou.";
+            btnNext.disabled = true;
+        }
+        draw();
+    }
+
+    function resetApp() {
+        nodes = [];
+        mstEdges = [];
+        fullTourOrder = [];
+        animationEdges = [];
+        currentStep = -1;
+        appState = 'adding_nodes';
+        
+        btnCompute.disabled = true;
+        btnNext.disabled = true;
+        btnNext.textContent = "Pasul Următor (sau Spațiu)";
+        statusText.textContent = "Faceți clic pe pânza albă pentru a plasa orașe.";
+        
+        // Ascunde vizualizarea alăturată
+        panelTsp.style.display = 'none';
+        document.getElementById('title-mst').style.display = 'none';
+        document.getElementById('title-tsp').style.display = 'none';
+        
+        resizeCanvas(); 
+    }
+
+    // --- Randarea Pânzei ---
+    function drawArrowhead(ctx, fromX, fromY, toX, toY, size) {
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const angle = Math.atan2(dy, dx);
+        const arrowX = toX - 15 * Math.cos(angle); 
+        const arrowY = toY - 15 * Math.sin(angle);
+
+        ctx.beginPath();
+        ctx.moveTo(arrowX, arrowY);
+        ctx.lineTo(arrowX - size * Math.cos(angle - Math.PI / 6), arrowY - size * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(arrowX - size * Math.cos(angle + Math.PI / 6), arrowY - size * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+    }
+
+    // Logica de desenare a nodurilor (reutilizabilă pentru ambele pânze)
+    function drawNodes(ctx, canvasEl) {
+        nodes.forEach(node => {
+            const {x, y} = getRealCoords(node, canvasEl);
+
+            ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetY = 2;
+
+            ctx.fillStyle = (node.id === 0) ? '#ccffcc' : 'white'; 
+            ctx.beginPath();
+            ctx.arc(x, y, 14, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0; 
+            ctx.shadowOffsetY = 0;
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#555';
+            ctx.stroke();
+
+            ctx.fillStyle = '#1c1e21';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(node.id, x, y);
+        });
+    }
+
+    function drawMST(ctx, canvasEl, faint = false) {
+        if (mstEdges.length === 0) return;
+        
+        ctx.lineWidth = faint ? 2 : 4;
+        ctx.strokeStyle = faint ? 'rgba(153, 255, 153, 0.4)' : '#99ff99'; 
+        
+        mstEdges.forEach(([u, v]) => {
+            const p1 = getRealCoords(nodes[u], canvasEl);
+            const p2 = getRealCoords(nodes[v], canvasEl);
+            
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+        });
+    }
+
+    function draw() {
+        // Curăță ambele pânze
+        ctxMst.clearRect(0, 0, canvasMst.width, canvasMst.height);
+        ctxTsp.clearRect(0, 0, canvasTsp.width, canvasTsp.height);
+
+        // --- DESENEAZĂ PÂNZA STÂNGĂ (APCM) ---
+        drawMST(ctxMst, canvasMst, false);
+        drawNodes(ctxMst, canvasMst);
+
+        // --- DESENEAZĂ PÂNZA DREAPTĂ (TUR TSP) ---
+        if (appState !== 'adding_nodes') {
+            // Desenează APCM estompat în fundalul pânzei de animație
+            drawMST(ctxTsp, canvasTsp, true);
+            
+            // Desenează muchiile roșii animate
+            if (currentStep >= 0 && animationEdges.length > 0) {
+                ctxTsp.lineWidth = 3;
+                ctxTsp.fillStyle = '#ff3333'; 
+                
+                for (let i = 0; i <= Math.min(currentStep, animationEdges.length - 1); i++) {
+                    const edge = animationEdges[i];
+                    const fromPos = getRealCoords(nodes[edge.from], canvasTsp);
+                    const toPos = getRealCoords(nodes[edge.to], canvasTsp);
+                    
+                    if (edge.type === 'shortcut') {
+                        ctxTsp.strokeStyle = '#ff3333'; 
+                        ctxTsp.setLineDash([8, 6]); 
+                    } else {
+                        ctxTsp.strokeStyle = '#ff3333';
+                        ctxTsp.setLineDash([]); 
+                    }
+
+                    ctxTsp.beginPath();
+                    ctxTsp.moveTo(fromPos.x, fromPos.y);
+                    ctxTsp.lineTo(toPos.x, toPos.y);
+                    ctxTsp.stroke();
+                    ctxTsp.setLineDash([]); 
+                    
+                    // Desenează vârful săgeții la cea mai recentă muchie
+                    if (i === currentStep) {
+                        drawArrowhead(ctxTsp, fromPos.x, fromPos.y, toPos.x, toPos.y, 15);
+                    }
+                }
+            }
+            drawNodes(ctxTsp, canvasTsp);
+        }
+    }
+</script>
+</body>
+</html>
