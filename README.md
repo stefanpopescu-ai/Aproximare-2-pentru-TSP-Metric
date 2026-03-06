@@ -4,7 +4,7 @@ O aplicație web interactivă care demonstrează vizual algoritmul de **Aproxima
 
 Proiectul permite utilizatorilor să plaseze "orașe" (noduri) pe un ecran și explică pas cu pas modul în care un **Arbore Parțial de Cost Minim (APCM)** poate fi folosit pentru a genera un traseu TSP valid, folosind parcurgerea în preordine și scurtături.
 
-![Logo Proiect](logo.png) *(Notă: Dacă ai salvat logo-ul generat anterior cu numele `logo.png` în repository, acesta va apărea aici)*
+![Logo Proiect](logo.png) 
 
 ## ✨ Caracteristici Principale
 
